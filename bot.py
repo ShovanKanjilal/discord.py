@@ -14,6 +14,10 @@ app = FastAPI()
 def health_check():
     return {"status": "ok"}
 
+@app.head("/uptimerobot")
+async def uptimerobot_check():
+    return {}  # Return an empty response body for HEAD request, no body content
+
 def run_http_server():
     uvicorn.run(app, host="0.0.0.0", port=8080)
 
