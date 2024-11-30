@@ -72,17 +72,17 @@ async def on_ready():
 async def on_message(message):
     if message.author == bot.user:
         return
+    if bot.user.mentioned_in(message) or "booblord" in message.content.lower():
+        print(f'Message from {message.author}: {message.content}')
 
-    print(f'Message from {message.author}: {message.content}')
+        # Get response from the Hugging Face model
+        model_response = await query_huggingface_model(message.content)
+        
+        # Send the model's response to the channel
+        await message.channel.send(model_response)
 
-    # Get response from the Hugging Face model
-    model_response = await query_huggingface_model(message.content)
-    
-    # Send the model's response to the channel
-    await message.channel.send(model_response)
-
-    # Process commands if any
-    await bot.process_commands(message)
+        # Process commands if any
+        await bot.process_commands(message)
 
 # Run the bot in an async main function
 async def main():
