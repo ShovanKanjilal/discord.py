@@ -1,6 +1,7 @@
 import discord
 import os
 import uvicorn
+import google.generativeai as genai
 import asyncio
 import aiohttp  # Async HTTP client
 from discord.ext import commands
@@ -21,10 +22,30 @@ async def uptimerobot_check():
 def run_http_server():
     uvicorn.run(app, host="0.0.0.0", port=8080)
 
+safety_settings = [
+    {
+        "category": "HARM_CATEGORY_DANGEROUS",
+        "threshold": "BLOCK_NONE"
+    },
+    {
+        "category": "HARM_CATEGORY_HARASSMENT",
+        "threshold": "BLOCK_NONE"
+    },
+    {
+        "category": "HARM_CATEGORY_SEXUAL",
+        "threshold": "BLOCK_NONE"
+    }
+]
+
 # Load environment variables
 load_dotenv()
 my_secret = os.getenv('secret_key')
 huggingface_api_key = os.getenv('HF_API_KEY')  # Your Hugging Face API key
+google_api=os.getenv('google_api')
+genai.configure(api_key=google_api)
+model=genai.GenerativeModel(model_name='gemini-1.5-flash-001',
+                            safety_settings=safety_settings)
+
 
 if not my_secret or not huggingface_api_key:
     raise ValueError("Missing environment variables for 'secret_key' or 'HF_API_KEY'")
@@ -36,32 +57,41 @@ bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 MODEL_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct"
 
 # Asynchronous function to query Hugging Face API
-async def query_huggingface_model(message_content):
-    headers = {
-        "Authorization": f"Bearer {huggingface_api_key}"
-    }
+# async def query_huggingface_model(message_content):
+#     headers = {
+#         "Authorization": f"Bearer {huggingface_api_key}"
+#     }
 
-    prompt = f"Respond to this message: '{message_content}'"
-    payload = {
-        "inputs": prompt
-    }
+#     prompt = f"Respond to this message: '{message_content}'"
+#     payload = {
+#         "inputs": prompt
+#     }
 
+#     try:
+#         async with aiohttp.ClientSession() as session:
+#             async with session.post(MODEL_URL, headers=headers, json=payload) as response:
+#                 if response.status != 200:
+#                     print(f"Error: {response.status}, {await response.text()}")
+#                     return "Sorry, I couldn't process your request properly."
+#                 data = await response.json()
+#                 generated_text = data[0].get('generated_text', "").strip()
+#                 if not generated_text:
+#                     return "Sorry, I couldn't process your request properly. Can you please clarify?"
+#                 return generated_text
+
+    # except Exception as e:
+    #     print(f"Error calling Hugging Face API: {e}")
+    #     return "Sorry, I couldn't process your request."
+async def booblord(prompt):
+    systeminstruction=f"Your name is booblord and lord sentu is your archenemy, your response will be very edgy and genz style, you will use dark humour.\n"
+    prompt=f"{systeminstruction}{prompt}"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(MODEL_URL, headers=headers, json=payload) as response:
-                if response.status != 200:
-                    print(f"Error: {response.status}, {await response.text()}")
-                    return "Sorry, I couldn't process your request properly."
-                data = await response.json()
-                generated_text = data[0].get('generated_text', "").strip()
-                if not generated_text:
-                    return "Sorry, I couldn't process your request properly. Can you please clarify?"
-                return generated_text
-
+        response=model.generate_content(prompt)
+        return response.text or "fuck you"
     except Exception as e:
-        print(f"Error calling Hugging Face API: {e}")
-        return "Sorry, I couldn't process your request."
-
+        print(f"error generating response : {e}")
+        return "I love you bitches"
+    
 # Define on_ready event
 @bot.event
 async def on_ready():
@@ -76,7 +106,7 @@ async def on_message(message):
         print(f'Message from {message.author}: {message.content}')
 
         # Get response from the Hugging Face model
-        model_response = await query_huggingface_model(message.content)
+        model_response = await booblord(message.content)
         
         # Send the model's response to the channel
         await message.channel.send(model_response)
