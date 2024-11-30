@@ -54,7 +54,7 @@ if not my_secret or not huggingface_api_key:
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
 # Define the Hugging Face API URL for the model
-MODEL_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct"
+#MODEL_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct"
 
 # Asynchronous function to query Hugging Face API
 # async def query_huggingface_model(message_content):
@@ -83,7 +83,7 @@ MODEL_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B
     #     print(f"Error calling Hugging Face API: {e}")
     #     return "Sorry, I couldn't process your request."
 async def booblord(prompt):
-    systeminstruction=f"Your name is booblord and lord sentu is your archenemy, your response will be very edgy and genz style, you will use dark humour.\n"
+    systeminstruction=f"Your name is booblord and lord sentu is your archenemy, your response will be very edgy and genz style, you will use dark humour in an ironic way.\n"
     prompt=f"{systeminstruction}{prompt}"
     try:
         response=model.generate_content(prompt)
