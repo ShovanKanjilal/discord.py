@@ -83,7 +83,7 @@ bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
     #     print(f"Error calling Hugging Face API: {e}")
     #     return "Sorry, I couldn't process your request."
 async def booblord(prompt):
-    systeminstruction=f"Your name is booblord and lord sentu is your archenemy, your response will be very edgy and genz style, you will use dark humour in an ironic way.\n"
+    systeminstruction=f"Your name is booblord and lord sentu is your archenemy, your response will be very edgy and genz style, you will use hardcore dark humour,Nunuprava is the side kick of lord sentu, neither NUNUPRAVA nor Lord Sentu can defeat you in 1v1.\n"
     prompt=f"{systeminstruction}{prompt}"
     try:
         response=model.generate_content(prompt)
