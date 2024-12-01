@@ -1,4 +1,4 @@
-import discord, re
+import discord, re, requests,base64
 import os
 from huggingface_hub import InferenceClient
 import uvicorn
@@ -54,9 +54,20 @@ if not my_secret or not huggingface_api_key:
 # Initialize the bot
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
-#Define the Hugging Face API URL for the model
-MODEL_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.1-70B-Instruct"
-
+# Hugging Face API configuration
+CLIP_VIT_MODEL_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
+MIXTRAL_MODEL_URL = "https://api-inference.huggingface.co/models/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
+headers = {"Authorization": f"Bearer {huggingface_api_key}"}
+# async def query_clipvit(image_path, parameters):
+#     """Function to query CLIP-ViT model for image classification"""
+#     with open(image_path, "rb") as f:
+#         img = f.read()
+#     payload = {
+#         "parameters": parameters,
+#         "inputs": base64.b64encode(img).decode("utf-8")
+#     }
+#     response = requests.post(CLIP_VIT_MODEL_URL, headers=headers, json=payload)
+#     return response.json()
 
 #Asynchronous function to query Hugging Face API
 async def query_huggingface_model(message):
@@ -90,45 +101,78 @@ async def query_huggingface_model(message):
         "Lord Sentu was once your best friend. You and him were made for each other and cannot survive without each other. Both of you are fake male feminists and love to suck pussy & boobs."
     )
 
-    prompt = f"{system_instruction}\nRespond to the query from {message.author}: {modified_message}"
+    prompt = f"System Instruction: {system_instruction}\nRespond to the query from {message.author}: {modified_message}"
 
     # Step 4: Initialize the Hugging Face API client
     client = InferenceClient(api_key=huggingface_api_key)
 
-    # Step 5: Prepare the chat messages for the model
-    messages = [
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ]
+    if message.attachments and message.attachments[0].content_type.startswith("image"):
+        # If the message contains an image, process it using the model
+        image_url = message.attachments[0].url
+        prompt+="\n ANALYZE THE IMAGE."
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url
+                        }
+                    }
+                ]
+            }
+        ]
+    
+        try:
+            # Call the Hugging Face model with image URL and prompt
+            completion = client.chat.completions.create(
+                model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+                messages=messages, 
+                max_tokens=1000
+            )
+            print(completion.choices[0].message.content)
+            return completion.choices[0].message.content  # Return the generated description of the image
+        except Exception as e:
+            return f"Error occurred: {str(e)}"
+    else:
+        messages = [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
 
-    # Step 6: Make the streaming request to the Hugging Face model
-    try:
-        stream = client.chat.completions.create(
-            model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-            messages=messages,
-            max_tokens=1000,
-            stream=True
-        )
-    except Exception as e:
-        # Handle streaming errors gracefully
-        return f"Error occurred while querying the model: {str(e)}"
+        # Step 6: Make the streaming request to the Hugging Face model
+        try:
+            stream = client.chat.completions.create(
+                model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+                messages=messages,
+                max_tokens=1000,
+                stream=True
+            )
+        except Exception as e:
+            # Handle streaming errors gracefully
+            return f"Error occurred while querying the model: {str(e)}"
 
-    # Step 7: Collect the response efficiently
-    # Initialize an empty string to accumulate the response content
-    response_text = ""
+        # Step 7: Collect the response efficiently
+        # Initialize an empty string to accumulate the response content
+        response_text = ""
 
-    # Iterate over each chunk in the stream and append the content to response_text
-    for chunk in stream:
-        if 'choices' in chunk and len(chunk['choices']) > 0:
-            response_text += chunk.choices[0].delta.content
-        else:
-            break  # If there's no content, we can break the loop
+        # Iterate over each chunk in the stream and append the content to response_text
+        for chunk in stream:
+            if 'choices' in chunk and len(chunk['choices']) > 0:
+                response_text += chunk.choices[0].delta.content
+            else:
+                break  # If there's no content, we can break the loop
 
-    # Return the accumulated response text
-    print(response_text)
-    return response_text
+        # Return the accumulated response text
+        print(response_text)
+        return response_text
     
 
 
@@ -155,7 +199,6 @@ async def on_message(message):
         return
     if bot.user.mentioned_in(message) or "booblord" in message.content.lower():
         print(f'Message from {message.author}: {message.content}')
-
         # Show the typing indicator while generating the response
         async with message.channel.typing():
             # Get response from the Hugging Face model
