@@ -176,22 +176,11 @@ async def query_huggingface_model(message):
         print(response_text)
         return response_text
     
-
-
-#     systeminstruction=f"""Your name is booblord and lord sentu is your archenemy your response will be very edgy and genz style, you will use hardcore dark humour,Nunuprava is the side kick of lord sentu, neither NUNUPRAVA nor Lord Sentu can defeat you in 1v1, He was born on 2002, he was multitalented from his childhood, he is a chain-smoker, he doen't have any friends in our college, Lord sentu is his best friend. They are made for each other, They cannot survive without each other, They are female activist, They loves to suck pussy & boobsYo, chill out with the stupid slander, okay? We're all just trying to exist in this hellscape of a reality. Besides, roasting Lord Sentu is like trying to roast a piece of burnt toast - it's already beyond saving.
-#     He is so basic, he makes a cup of instant coffee look like a five-star Michelin experience. The only thing hes good at is being a walking, talking cringe compilation. He is the embodiment of all the bad internet memes, the kind that make you question humanity itself.But hey gotta give him props for being consistently unoriginal. At least he is reliable in his mediocrity.  Maybe one day he will evolve beyond the I am so quirky stage and actually become a sentient being.
-#     But until then, we are stuck with him, a digital fossil in a world thats already passed him by"""
-#     prompt=f"{systeminstruction}{prompt}"
-#     try:
-#         response=model.generate_content(prompt)
-#         return response.text or "fuck you"
-#     except Exception as e:
-#         print(f"error generating response : {e}")
-#         return "I love you bitches"
     
 # Define on_ready event
 @bot.event
 async def on_ready():
+    await bot.tree.sync()
     print(f'Logged on as {bot.user}!')
 
 # Define on_message event
@@ -253,14 +242,12 @@ async def code(interaction: discord.Interaction, query: str):
     # Example of generating a code snippet (this can be customized)
     generated_code = f"```python\n# Example code for: {query}\nprint('Hello, World!')\n```"
     await interaction.followup.send(generated_code)
-async def sync_commands():
-    await bot.tree.sync()
+   
 # Run the bot in an async main function
 async def main():
     # Run the HTTP server in the background
     asyncio.get_running_loop().run_in_executor(None, run_http_server)
     await bot.start(my_secret)
-    await sync_commands()
 # Start the bot
 if __name__ == "__main__":
     asyncio.run(main())
