@@ -1,6 +1,8 @@
 import discord, re, requests,base64
 import os
 from huggingface_hub import InferenceClient
+from discord.ext import commands
+from discord import app_commands
 import uvicorn
 import google.generativeai as genai
 import asyncio
@@ -225,13 +227,40 @@ async def on_message(message):
 
         # Process commands if any
         await bot.process_commands(message)
+@bot.tree.command(name="roast", description="Roast a user or target")
+@app_commands.describe(target="The user you want to roast")
+async def roast(interaction: discord.Interaction, target: str = "Lord Sentu"):
+    """Handles roasting a target."""
+    roast_message = f"Get ready for a roast! {target}, you're about to get roasted!"
+    
+    # Respond with the roast message
+    await interaction.response.send_message(roast_message)
 
+    # Example of calling your AI model or some response logic
+    model_response = await query_huggingface_model(interaction.message)
+    await interaction.followup.send(model_response)
+
+# Define the /code slash command
+@bot.tree.command(name="code", description="Generate code for a query")
+@app_commands.describe(query="Describe the code you need")
+async def code(interaction: discord.Interaction, query: str):
+    """Handles code generation for the user query."""
+    code_message = f"Here is the code for your query: {query}"
+
+    # Respond with a basic code example
+    await interaction.response.send_message(code_message)
+
+    # Example of generating a code snippet (this can be customized)
+    generated_code = f"```python\n# Example code for: {query}\nprint('Hello, World!')\n```"
+    await interaction.followup.send(generated_code)
+async def sync_commands():
+    await bot.tree.sync()
 # Run the bot in an async main function
 async def main():
     # Run the HTTP server in the background
     asyncio.get_running_loop().run_in_executor(None, run_http_server)
     await bot.start(my_secret)
-
+    await sync_commands()
 # Start the bot
 if __name__ == "__main__":
     asyncio.run(main())
