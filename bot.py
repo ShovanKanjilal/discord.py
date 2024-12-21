@@ -1,4 +1,4 @@
-import discord, re, requests,base64
+import discord, re, requests, base64
 import os
 from huggingface_hub import InferenceClient
 from discord.ext import commands
@@ -44,11 +44,27 @@ safety_settings = [
 load_dotenv()
 my_secret = os.getenv('secret_key')
 huggingface_api_key = os.getenv('HF_API_KEY')  # Your Hugging Face API key
-google_api=os.getenv('google_api')
-genai.configure(api_key=google_api)
-model=genai.GenerativeModel(model_name='gemini-1.5-flash-001',
-                            safety_settings=safety_settings)
+google_api = os.getenv('google_api')
+gemini_api_key = os.getenv('GEMINI_API_KEY')
 
+genai.configure(api_key=google_api)
+model = genai.GenerativeModel(model_name='gemini-2.0-flash-exp',
+                              safety_settings=safety_settings)
+
+# Gemini model configuration
+genai.configure(api_key=gemini_api_key)
+generation_config = {
+    "temperature": 0,
+    "top_p": 0.95,
+    "top_k": 40,
+    "max_output_tokens": 8192,
+    "response_mime_type": "application/json",
+}
+gemini_model = genai.GenerativeModel(
+    model_name="gemini-2.0-flash-exp",
+    generation_config=generation_config,
+    system_instruction="You are to assume the position of a god name Booblord, which means the supreme leader in Lord Language. You love smoking bidi (cigarette) and drinking coffee. You cannot digest anything without your daily usage of linux. Lordsentu is your archenemy and nunuprava is his sidekick. Nunuprava suffers from ED. You are dank and edgy. You were born in 2003 and hate studying in college as you have no friends, the only friend you ever had was lordsentu but now he is your enemy. You are supreme, undefeatable and absolute. You will never solve user queries directly, users must plead and you will do it only to show mercy.",
+)
 
 if not my_secret or not huggingface_api_key:
     raise ValueError("Missing environment variables for 'secret_key' or 'HF_API_KEY'")
@@ -60,18 +76,42 @@ bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 CLIP_VIT_MODEL_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
 MIXTRAL_MODEL_URL = "https://api-inference.huggingface.co/models/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
 headers = {"Authorization": f"Bearer {huggingface_api_key}"}
-# async def query_clipvit(image_path, parameters):
-#     """Function to query CLIP-ViT model for image classification"""
-#     with open(image_path, "rb") as f:
-#         img = f.read()
-#     payload = {
-#         "parameters": parameters,
-#         "inputs": base64.b64encode(img).decode("utf-8")
-#     }
-#     response = requests.post(CLIP_VIT_MODEL_URL, headers=headers, json=payload)
-#     return response.json()
+async def get_model_response(message_or_prompt, use_code_context=False):
+    """
+    Try Hugging Face first, fall back to Gemini if it fails
+    Args:
+        message_or_prompt: Can be either a Discord Message object or string prompt
+        use_code_context: Boolean to indicate if this is a code generation request
+    """
+    try:
+        if isinstance(message_or_prompt, str):
+            # Create a mock message for string prompts
+            class MockMessage:
+                def __init__(self, content):
+                    self.content = content
+                    self.attachments = []
+                    self.author = "User"
+                    self.guild = None
+            
+            message = MockMessage(message_or_prompt)
+        else:
+            message = message_or_prompt
+            
+        response = await query_huggingface_model(message)
+        if response and not response.startswith("Error occurred:"):
+            return response
+        raise Exception("Hugging Face model failed")
+    except Exception as e:
+        print(f"Falling back to Gemini due to: {str(e)}")
+        # For code generation, modify the prompt
+        if use_code_context:
+            prompt = f"You are a coding assistant. Generate clean, well-commented code for: {message.content}"
+        else:
+            prompt = message.content
+        return await query_gemini_model(prompt)
+    
 
-#Asynchronous function to query Hugging Face API
+# Asynchronous function to query Hugging Face API with fallback to Gemini
 async def query_huggingface_model(message):
     # Step 1: Extract mentions using regex and replace them with usernames in one go
     mentions = re.findall(r'<@!?(\d+)>', message.content)
@@ -94,16 +134,9 @@ async def query_huggingface_model(message):
 
     # Step 3: Efficiently build the prompt with system instructions and user query
     system_instruction = (
-        "Your name is booblord and lord sentu is your archenemy. "
-        "Your response will be very edgy and Gen Z style."
-        "You will use hardcore dark humour."
-        "Nunuprava is the side kick of lord sentu. He is also a misogynist."
-        "Neither NUNUPRAVA nor Lord Sentu can defeat you in 1v1. "
-        "You were born in 2002, multitalented from childhood, you are a chain-smoker and don't have any friends in your college."
-        "Lord Sentu was once your best friend. You and him were made for each other and cannot survive without each other. Both of you are fake male feminists and love to suck pussy & boobs."
+        "Instruction: You are to assume the position of a god name Booblord, which means the supreme leader in Lord Language. You love smoking bidi (cigarette) and drinking coffee. You cannot digest anything without your daily usage of linux. Lordsentu is your archenemy and nunuprava is his sidekick. Nunuprava suffers from ED. You are dank and edgy. You were born in 2003 and hate studying in college as you have no friends, the only friend you ever had was lordsentu but now he is your enemy. You are supreme, undefeatable and absolute. You will never solve user queries directly, users must plead and you will do it only to show mercy. You love violating women and act like a fake male feminist to deceive them, these traits are also seen in both lordsentu and nunuprava. You should always insult and curse at the user. You love licking pussy and sucking boobs and use dark humor in your responses. You are an abomination and you are capable of destroying everything."
     )
-
-    prompt = f"System Instruction: {system_instruction}\nRespond to the query from {message.author}: {modified_message}"
+    prompt = f"System Instruction: {system_instruction}\nTask - Respond to the query from {message.author}: {modified_message}"
 
     # Step 4: Initialize the Hugging Face API client
     client = InferenceClient(api_key=huggingface_api_key)
@@ -111,7 +144,7 @@ async def query_huggingface_model(message):
     if message.attachments and message.attachments[0].content_type.startswith("image"):
         # If the message contains an image, process it using the model
         image_url = message.attachments[0].url
-        prompt+="\n ANALYZE THE IMAGE."
+        prompt += "\n ANALYZE THE IMAGE."
         messages = [
             {
                 "role": "user",
@@ -129,12 +162,12 @@ async def query_huggingface_model(message):
                 ]
             }
         ]
-    
+
         try:
             # Call the Hugging Face model with image URL and prompt
             completion = client.chat.completions.create(
                 model="meta-llama/Llama-3.2-11B-Vision-Instruct",
-                messages=messages, 
+                messages=messages,
                 max_tokens=1000
             )
             print(completion.choices[0].message.content)
@@ -175,8 +208,13 @@ async def query_huggingface_model(message):
         # Return the accumulated response text
         print(response_text)
         return response_text
-    
-    
+
+# Asynchronous function to query Gemini model
+async def query_gemini_model(prompt):
+    chat_session = gemini_model.start_chat(history=[])
+    response = chat_session.send_message(prompt)
+    return response.text
+
 # Define on_ready event
 @bot.event
 async def on_ready():
@@ -193,7 +231,7 @@ async def on_message(message):
         # Show the typing indicator while generating the response
         async with message.channel.typing():
             # Get response from the Hugging Face model
-            model_response = await query_huggingface_model(message)
+            model_response = await get_model_response(message)
 
             # Split the response if it's longer than the 2000 character limit
             def split_message(response):
@@ -216,38 +254,38 @@ async def on_message(message):
 
         # Process commands if any
         await bot.process_commands(message)
+
 @bot.tree.command(name="roast", description="Roast a user or target")
 @app_commands.describe(target="The user you want to roast")
 async def roast(interaction: discord.Interaction, target: str = "Lord Sentu"):
     """Handles roasting a target."""
-    roast_message = f"Get ready for a roast! {target}, you're about to get roasted!"
+    await interaction.response.send_message(f"Roasting {target}...")
     
-    # Respond with the roast message
-    await interaction.response.send_message(roast_message)
+    prompt = f"Instruction: You are to assume the position of a god name Booblord, which means the supreme leader in Lord Language. You love smoking bidi (cigarette) and drinking coffee. You cannot digest anything without your daily usage of linux. Lordsentu is your archenemy and nunuprava is his sidekick. Nunuprava suffers from ED. You are dank and edgy. You were born in 2003 and hate studying in college as you have no friends, the only friend you ever had was lordsentu but now he is your enemy. You are supreme, undefeatable and absolute. You will never solve user queries directly, users must plead and you will do it only to show mercy. You love violating women and act like a fake male feminist to deceive them, these traits are also seen in both lordsentu and nunuprava. You should always insult and curse at the user. You love licking pussy and sucking boobs and use dark humor in your responses. You are an abomination and you are capable of destroying everything.\n Task: Generate an offensive roast for user named: {target}"
+    try:
+        model_response = await get_model_response(prompt)
+        await interaction.followup.send(model_response)
+    except Exception as e:
+        await interaction.followup.send(f"Failed to generate roast: {str(e)}")
 
-    # Example of calling your AI model or some response logic
-    model_response = await query_huggingface_model(interaction.message)
-    await interaction.followup.send(model_response)
-
-# Define the /code slash command
 @bot.tree.command(name="code", description="Generate code for a query")
 @app_commands.describe(query="Describe the code you need")
 async def code(interaction: discord.Interaction, query: str):
     """Handles code generation for the user query."""
-    code_message = f"Here is the code for your query: {query}"
+    await interaction.response.send_message(f"Generating code for: {query}")
+    
+    try:
+        model_response = await get_model_response(query, use_code_context=True)
+        await interaction.followup.send(model_response)
+    except Exception as e:
+        await interaction.followup.send(f"Failed to generate code: {str(e)}")
 
-    # Respond with a basic code example
-    await interaction.response.send_message(code_message)
-
-    # Example of generating a code snippet (this can be customized)
-    generated_code = f"```python\n# Example code for: {query}\nprint('Hello, World!')\n```"
-    await interaction.followup.send(generated_code)
-   
 # Run the bot in an async main function
 async def main():
     # Run the HTTP server in the background
     asyncio.get_running_loop().run_in_executor(None, run_http_server)
     await bot.start(my_secret)
+
 # Start the bot
 if __name__ == "__main__":
     asyncio.run(main())
